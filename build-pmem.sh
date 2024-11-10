@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-script_dir=$(dirname $0)
-source $script_dir/env.sh
-
-./do_cmake.sh -DWITH_SYSTEM_BOOST=ON -DBoost_NO_BOOST_CMAKE=ON -DWITH_SYSTEM_ROCKSDB=ON -DWITH_SYSTEM_LIBURING=ON -DPython3_EXECUTABLE=$PYTHON_ROOT/bin/python -DROCKSDB_ROOT=$ROCKSDB_ROOT -DBOOST_ROOT=$BOOST_ROOT -DPMEM_ROOT=$PMEM_ROOT

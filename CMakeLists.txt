@@ -607,6 +607,12 @@ if (WITH_SYSTEM_ROCKSDB)
   find_package(RocksDB 5.14 REQUIRED)
 endif()
 
+# KVDK
+option(WITH_SYSTEM_KVDK "require and build with system KVDK" OFF)
+if (WITH_SYSTEM_KVDK)
+  find_package(KVDK REQUIRED)
+endif()
+
 option(WITH_SEASTAR "Build seastar components")
 set(HAVE_SEASTAR ${WITH_SEASTAR})
 
