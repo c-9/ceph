@@ -84,7 +84,7 @@ if(RocksDB_FOUND)
       IMPORTED_LINK_INTERFACE_LANGUAGES "CXX"
       IMPORTED_LOCATION "${ROCKSDB_LIBRARIES}"
       VERSION "${ROCKSDB_VERSION_STRING}")
-    print_target_properties(RocksDB::RocksDB)
   endif()
+  print_target_properties(RocksDB::RocksDB)
 endif()
 

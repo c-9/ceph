@@ -6585,7 +6585,9 @@ int BlueStore::_prepare_db_environment(bool create, bool read_only,
       env = new rocksdb::EnvMirror(b, a, false, true);
     } else {
       env = new BlueRocksEnv(bluefs);
-
+      #if defined(HAVE_PMEM_ROCKSDB)
+      env = rocksdb::NewDCPMMEnv(rocksdb::DCPMMEnvOptions(), env);
+      #endif
       // simplify the dir names, too, as "seen" by rocksdb
       fn = "db";
     }
@@ -6622,6 +6624,9 @@ int BlueStore::_prepare_db_environment(bool create, bool read_only,
       }
     }
   } else {
+    #if defined(HAVE_PMEM_ROCKSDB)
+    env = rocksdb::NewDCPMMEnv(rocksdb::DCPMMEnvOptions());
+    #endif
     string walfn = path + "/db.wal";
 
     if (create) {

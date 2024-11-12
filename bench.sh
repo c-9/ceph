@@ -3,24 +3,29 @@
 script_dir=$(dirname $0)
 source $script_dir/env.sh
 
-VSTART_DEST=$CEPH_ROOT/build
-#VSTART_DEST=/mnt/pmem1/build
-
+# VSTART_DEST=$CEPH_ROOT
+VSTART_DEST=/mnt/pmem0/ceph
+# VSTART_DEST=/mnt/pmem1/ceph1
+BTIME=10
+BSIZE=1MB
+BTHREAD=16
+BDEPTH=16
 echo "================status================="
-$CEPH_ROOT/build/bin/ceph -c $VSTART_DEST/ceph.conf -s
+$CEPH_BUILD_ROOT/bin/ceph -c $VSTART_DEST/ceph.conf -s
 
 echo "================create================="
-$CEPH_ROOT/build/bin/ceph -c $VSTART_DEST/ceph.conf osd pool create testbench 100 100
+$CEPH_BUILD_ROOT/bin/ceph -c $VSTART_DEST/ceph.conf osd pool delete testbench testbench --yes-i-really-really-mean-it
+$CEPH_BUILD_ROOT/bin/ceph -c $VSTART_DEST/ceph.conf osd pool create testbench 100 100
 
 echo "================write================="
-echo 3 | sudo tee /proc/sys/vm/drop_caches && sudo sync
-$CEPH_ROOT/build/bin/rados -c $VSTART_DEST/ceph.conf bench -p testbench 10 write --no-cleanup
+sudo sync && echo 3 | sudo tee /proc/sys/vm/drop_caches && sudo sync
+$CEPH_BUILD_ROOT/bin/rados -c $VSTART_DEST/ceph.conf bench -p testbench $BTIME write -t $BTHREAD -b $BSIZE --no-cleanup
 
 echo "================sr================="
-echo 3 | sudo tee /proc/sys/vm/drop_caches && sudo sync
-$CEPH_ROOT/build/bin/rados -c $VSTART_DEST/ceph.conf bench -p testbench 10 seq
+sudo sync && echo 3 | sudo tee /proc/sys/vm/drop_caches && sudo sync
+$CEPH_BUILD_ROOT/bin/rados -c $VSTART_DEST/ceph.conf bench -p testbench $BTIME seq -t $BTHREAD
 
 echo "================rr================="
-echo 3 | sudo tee /proc/sys/vm/drop_caches && sudo sync
-$CEPH_ROOT/build/bin/rados -c $VSTART_DEST/ceph.conf bench -p testbench 10 rand
+sudo sync && echo 3 | sudo tee /proc/sys/vm/drop_caches && sudo sync
+$CEPH_BUILD_ROOT/bin/rados -c $VSTART_DEST/ceph.conf bench -p testbench $BTIME rand -t $BTHREAD
 
