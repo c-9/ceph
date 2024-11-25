@@ -7,7 +7,7 @@ source $script_dir/env.sh
 VSTART_DEST=/mnt/pmem0/ceph
 # VSTART_DEST=/mnt/pmem1/ceph1
 BTIME=10
-BSIZE=1MB
+BSIZE=4MB
 BTHREAD=16
 BDEPTH=16
 echo "================status================="

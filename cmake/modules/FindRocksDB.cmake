@@ -45,7 +45,7 @@ function(print_target_properties target)
 endfunction()
 
 find_path(ROCKSDB_INCLUDE_DIR rocksdb/db.h HINTS ${ROCKSDB_ROOT}/include)
-find_library(ROCKSDB_LIBRARIES NAMES librocksdb.a rocksdb HINTS ${ROCKSDB_ROOT}/lib)
+find_library(ROCKSDB_LIBRARIES NAMES librocksdb.so rocksdb HINTS ${ROCKSDB_ROOT}/lib)
 find_path(PMEM_INCLUDE_DIR libpmem.h HINTS ${PMEM_ROOT}/include)
 find_library(PMEM_LIBRARY NAMES pmem HINTS ${PMEM_ROOT}/lib)
 find_library(PMEMOBJ_LIBRARY NAMES pmemobj HINTS ${PMEM_ROOT}/lib)

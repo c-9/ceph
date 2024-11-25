@@ -36,8 +36,10 @@ struct XorMergeOperator : public KeyValueDB::MergeOperator {
     const char *rdata, size_t rlen,
     std::string *new_value) override {
     ceph_assert(llen == rlen);
+    ceph_assert(llen > 0);
+    ceph_assert(ldata[0] == rdata[0]);
     *new_value = std::string(ldata, llen);
-    for (size_t i = 0; i < rlen; ++i) {
+    for (size_t i = 1; i < rlen; ++i) {
       (*new_value)[i] ^= rdata[i];
     }
   }

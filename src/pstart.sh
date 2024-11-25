@@ -161,7 +161,8 @@ rgw_frontend="beast"
 rgw_compression=""
 lockdep=${LOCKDEP:-1}
 spdk_enabled=0 #disable SPDK by default
-pmem_enabled=0 
+pmem_enabled=0
+pmem_rocksdb_enabled=0
 zoned_enabled=0
 io_uring_enabled=0
 with_jaeger=0
@@ -230,6 +231,7 @@ options:
 	--without-dashboard: do not run using mgr dashboard
 	--bluestore-spdk: enable SPDK and with a comma-delimited list of PCI-IDs of NVME device (e.g, 0000:81:00.0)
     --bluestore-pmem: enable PMEM
+    --pmem-rocksdb: enable pmem-rocksdb
 	--msgr1: use msgr1 only
 	--msgr2: use msgr2 only
 	--msgr21: use msgr2 and msgr1
@@ -508,6 +510,9 @@ case $1 in
         parse_block_devs --bluestore-devs "$2"
         shift
         ;;
+    --pmem-rocksdb)
+        pmem_rocksdb_enabled=1
+        ;;
     --bluestore-devs)
         parse_block_devs --bluestore-devs "$2"
         shift
@@ -736,6 +741,10 @@ EOF
         bluestore_block_wal_size = 1073741824
         bluestore_block_wal_create = true
         bluestore_bluefs = true"
+            if [ "$pmem_rocksdb_enabled" -eq 1 ]; then
+                BLUESTORE_OPTS+="
+        bluestore_rocksdb_options = allow_dcpmm_writes=true,recycle_dcpmm_sst=true,dcpmm_kvs_enable=true,dcpmm_kvs_level=0,dcpmm_kvs_mmapped_file_fullpath=$CEPH_DEV_DIR/osd\$id/kvs,dcpmm_kvs_mmapped_file_size=1073741824,dcpmm_kvs_value_thres=64,dcpmm_compress_value=false,allow_mmap_reads=true"
+            fi
         else
             BLUESTORE_OPTS="        bluestore block db path = $CEPH_DEV_DIR/osd\$id/block.db.file
         bluestore block db size = 1073741824
@@ -1005,6 +1014,8 @@ EOF
             echo "{\"cephx_secret\": \"$OSD_SECRET\"}" > $CEPH_DEV_DIR/osd$osd/new.json
             ceph_adm osd new $uuid -i $CEPH_DEV_DIR/osd$osd/new.json
             rm $CEPH_DEV_DIR/osd$osd/new.json
+            echo $OSD_SECRET $uuid
+            # exit 0
             prun $SUDO $CEPH_BIN/$ceph_osd $extra_osd_args -i $osd $ARGS --mkfs --key $OSD_SECRET --osd-uuid $uuid $extra_seastar_args
 
             local key_fn=$CEPH_DEV_DIR/osd$osd/keyring
@@ -1015,6 +1026,7 @@ EOF
         fi
         echo start osd.$osd
         local osd_pid
+        # exit 0
         run 'osd' $osd $SUDO $CEPH_BIN/$ceph_osd \
             $extra_seastar_args $extra_osd_args \
             -i $osd $ARGS $COSD_ARGS &
