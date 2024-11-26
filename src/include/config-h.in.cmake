@@ -117,6 +117,9 @@
 /* PMEM_DEVICE (OSD) conditional compilation */
 #cmakedefine HAVE_BLUESTORE_PMEM
 
+/* PMEM-ROCKSDB conditional compilation */
+#cmakedefine HAVE_PMEM_ROCKSDB
+
 /* Define if you have tcmalloc */
 #cmakedefine HAVE_LIBTCMALLOC
 #cmakedefine LIBTCMALLOC_MISSING_ALIGNED_ALLOC

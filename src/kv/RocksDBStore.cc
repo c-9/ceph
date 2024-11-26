@@ -33,6 +33,10 @@
 
 #include "common/debug.h"
 
+#if defined(HAVE_PMEM_ROCKSDB)
+#include "rocksdb/kvs_dcpmm.h"
+#endif
+
 #define dout_context cct
 #define dout_subsys ceph_subsys_rocksdb
 #undef dout_prefix
@@ -492,7 +496,7 @@ int RocksDBStore::load_rocksdb_options(bool create_if_missing, rocksdb::Options&
   }
 
   opt.create_if_missing = create_if_missing;
-  if (kv_options.count("separate_wal_dir")) {
+  if (!opt.wal_dir.size() && kv_options.count("separate_wal_dir")) {
     opt.wal_dir = path + ".wal";
   }
 
@@ -580,9 +584,9 @@ int RocksDBStore::load_rocksdb_options(bool create_if_missing, rocksdb::Options&
         cct->_conf.get_val<bool>("rocksdb_cache_index_and_filter_blocks_with_high_priority");
     bbt_opts.pin_l0_filter_and_index_blocks_in_cache =
       cct->_conf.get_val<bool>("rocksdb_pin_l0_filter_and_index_blocks_in_cache");
-    #if defined(HAVE_PMEM_ROCKSDB)
+#if defined(HAVE_PMEM_ROCKSDB)
     // bbt_opts.cache_index_and_filter_blocks_for_mmap_read = true
-    #endif
+#endif
   }
   bbt_opts.partition_filters = cct->_conf.get_val<bool>("rocksdb_partition_filters");
   if (cct->_conf.get_val<Option::size_t>("rocksdb_metadata_block_size") > 0)

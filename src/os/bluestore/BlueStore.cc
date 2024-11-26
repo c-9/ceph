@@ -51,6 +51,10 @@
 #include "common/pretty_binary.h"
 #include "kv/KeyValueHistogram.h"
 
+#if defined(HAVE_PMEM_ROCKSDB)
+#include "rocksdb/kvs_dcpmm.h"
+#endif
+
 #ifdef HAVE_LIBZBD
 #include "ZonedAllocator.h"
 #include "ZonedFreelistManager.h"
@@ -6585,9 +6589,38 @@ int BlueStore::_prepare_db_environment(bool create, bool read_only,
       env = new rocksdb::EnvMirror(b, a, false, true);
     } else {
       env = new BlueRocksEnv(bluefs);
-      #if defined(HAVE_PMEM_ROCKSDB)
-      env = rocksdb::NewDCPMMEnv(rocksdb::DCPMMEnvOptions(), env);
-      #endif
+#if defined(HAVE_PMEM_ROCKSDB)
+      // env = rocksdb::NewDCPMMEnv(rocksdb::DCPMMEnvOptions(), env);
+      string walfn = path + "/wal";
+
+      if (create) {
+        int r = ::mkdir(fn.c_str(), 0755);
+        if (r < 0)
+          r = -errno;
+        if (r < 0 && r != -EEXIST) {
+          derr << __func__ << " failed to create " << fn << ": " << cpp_strerror(r)
+            << dendl;
+          return r;
+        }
+
+        // wal_dir, too!
+        r = ::mkdir(walfn.c_str(), 0755);
+        if (r < 0)
+          r = -errno;
+        if (r < 0 && r != -EEXIST) {
+          derr << __func__ << " failed to create " << walfn
+            << ": " << cpp_strerror(r)
+            << dendl;
+          return r;
+        }
+      } else {
+        struct stat st;
+        r = ::stat(walfn.c_str(), &st);
+        if (r < 0 && errno == ENOENT) {
+          kv_options.erase("separate_wal_dir");
+        }
+      }
+#endif
       // simplify the dir names, too, as "seen" by rocksdb
       fn = "db";
     }
@@ -6620,13 +6653,13 @@ int BlueStore::_prepare_db_environment(bool create, bool read_only,
       // check for dir presence
       auto r = env->GetChildren(fn+".wal", &res);
       if (r.IsNotFound()) {
-	kv_options.erase("separate_wal_dir");
+	      kv_options.erase("separate_wal_dir");
       }
     }
   } else {
-    #if defined(HAVE_PMEM_ROCKSDB)
+#if defined(HAVE_PMEM_ROCKSDB)
     env = rocksdb::NewDCPMMEnv(rocksdb::DCPMMEnvOptions());
-    #endif
+#endif
     string walfn = path + "/db.wal";
 
     if (create) {

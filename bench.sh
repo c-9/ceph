@@ -6,7 +6,7 @@ source $script_dir/env.sh
 # VSTART_DEST=$CEPH_ROOT
 VSTART_DEST=/mnt/pmem0/ceph
 # VSTART_DEST=/mnt/pmem1/ceph1
-BTIME=10
+BTIME=30
 BSIZE=4MB
 BTHREAD=16
 BDEPTH=16
