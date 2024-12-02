@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 script_dir=$(dirname $0)
-source $script_dir/env.sh
+source $script_dir/../env.sh
 
 # VSTART_DEST=$CEPH_ROOT
 VSTART_DEST=/mnt/pmem0/ceph

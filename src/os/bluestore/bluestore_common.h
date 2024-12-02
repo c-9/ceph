@@ -19,6 +19,10 @@
 #include "include/ceph_assert.h"
 #include "kv/KeyValueDB.h"
 
+#if defined(HAVE_PMEM_ROCKSDB)
+#include "rocksdb/kvs_dcpmm.h"
+#endif
+
 template <class Bitset, class Func>
 void apply_for_bitset_range(uint64_t off,
   uint64_t len,
@@ -46,12 +50,23 @@ struct Int64ArrayMergeOperator : public KeyValueDB::MergeOperator {
     const char *rdata, size_t rlen,
     std::string *new_value) override {
     ceph_assert(llen == rlen);
+#if defined(HAVE_PMEM_ROCKSDB)
+    size_t kvs_offset= rocksdb::KVSEnabled() ? 1 : 0;
+    ceph_assert(llen - kvs_offset >= 0);
+    ceph_assert(((rlen - kvs_offset) % 8) == 0);
+    new_value->resize(rlen);
+    const ceph_le64* lv = (const ceph_le64*)(ldata+kvs_offset);
+    const ceph_le64* rv = (const ceph_le64*)(rdata+kvs_offset);
+    ceph_le64* nv = &(ceph_le64&)(new_value+kvs_offset)->at(0);
+    for (size_t i = 0; i < (rlen - kvs_offset) >> 3; ++i) {
+#else
     ceph_assert((rlen % 8) == 0);
     new_value->resize(rlen);
     const ceph_le64* lv = (const ceph_le64*)ldata;
     const ceph_le64* rv = (const ceph_le64*)rdata;
     ceph_le64* nv = &(ceph_le64&)new_value->at(0);
     for (size_t i = 0; i < rlen >> 3; ++i) {
+#endif
       nv[i] = lv[i] + rv[i];
     }
   }
