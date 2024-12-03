@@ -743,8 +743,10 @@ EOF
         bluestore_bluefs = true"
             if [ "$pmem_rocksdb_enabled" -eq 1 ]; then
                 BLUESTORE_OPTS+="
-        bluestore_rocksdb_options = allow_dcpmm_writes=true,recycle_dcpmm_sst=true,dcpmm_kvs_enable=true,dcpmm_kvs_level=0,dcpmm_kvs_mmapped_file_fullpath=$CEPH_DEV_DIR/osd\$id/kvs,dcpmm_kvs_mmapped_file_size=4294967296,dcpmm_kvs_value_thres=64,dcpmm_compress_value=false,allow_mmap_reads=true"
-                # wal_dir=$CEPH_DEV_DIR/osd\$id/wal,
+        bluestore_rocksdb_options = wal_dir=$CEPH_DEV_DIR/osd\$id/wal,allow_dcpmm_writes=true,recycle_dcpmm_sst=true,dcpmm_kvs_enable=true,dcpmm_kvs_level=0,dcpmm_kvs_mmapped_file_fullpath=$CEPH_DEV_DIR/osd\$id/kvs,dcpmm_kvs_mmapped_file_size=4294967296,dcpmm_kvs_value_thres=64,dcpmm_compress_value=false,allow_mmap_reads=true
+        ; wal_dir=$CEPH_DEV_DIR/osd\$id/wal,
+        ; bluestore_bluefs_env_mirror = false
+        "
             fi
         else
             BLUESTORE_OPTS="        bluestore block db path = $CEPH_DEV_DIR/osd\$id/block.db.file

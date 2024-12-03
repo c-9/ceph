@@ -27,7 +27,7 @@ directory=/mnt/pmem0/ceph/dev/osd0/ # directory for osd_data
                        # to couple writes with. Default: 0 (disabled)
 #single_pool_mode=0   # Enables the mode when all jobs run against for the same pool.
 
-rw=randwrite
+rw=write
 iodepth=16
 
 time_based=1
@@ -36,4 +36,7 @@ runtime=20s
 [bluestore]
 nr_files=64
 size=256m
-bs=64k
+bs=4m
+numjobs=16
+# nice=-20
+# prio=0

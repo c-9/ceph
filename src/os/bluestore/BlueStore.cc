@@ -6589,41 +6589,49 @@ int BlueStore::_prepare_db_environment(bool create, bool read_only,
       env = new rocksdb::EnvMirror(b, a, false, true);
     } else {
       env = new BlueRocksEnv(bluefs);
-#if defined(HAVE_PMEM_ROCKSDB)
-      // env = rocksdb::NewDCPMMEnv(rocksdb::DCPMMEnvOptions(), env);
-      string walfn = path + "/wal";
 
-      if (create) {
-        int r = ::mkdir(fn.c_str(), 0755);
-        if (r < 0)
-          r = -errno;
-        if (r < 0 && r != -EEXIST) {
-          derr << __func__ << " failed to create " << fn << ": " << cpp_strerror(r)
-            << dendl;
-          return r;
-        }
-
-        // wal_dir, too!
-        r = ::mkdir(walfn.c_str(), 0755);
-        if (r < 0)
-          r = -errno;
-        if (r < 0 && r != -EEXIST) {
-          derr << __func__ << " failed to create " << walfn
-            << ": " << cpp_strerror(r)
-            << dendl;
-          return r;
-        }
-      } else {
-        struct stat st;
-        r = ::stat(walfn.c_str(), &st);
-        if (r < 0 && errno == ENOENT) {
-          kv_options.erase("separate_wal_dir");
-        }
-      }
-#endif
       // simplify the dir names, too, as "seen" by rocksdb
       fn = "db";
     }
+#if defined(HAVE_PMEM_ROCKSDB)
+    // env = rocksdb::NewDCPMMEnv(rocksdb::DCPMMEnvOptions(), env);
+    env = rocksdb::NewDCPMMEnv(rocksdb::DCPMMEnvOptions());
+    fn = path + "/db";
+    string walfn = path + "/wal";
+
+    if (create) {
+      int r = ::mkdir(fn.c_str(), 0755);
+      if (r < 0)
+        r = -errno;
+      if (r < 0 && r != -EEXIST) {
+        derr << __func__ << " failed to create " << fn << ": " << cpp_strerror(r)
+          << dendl;
+        return r;
+      }
+
+      // wal_dir, too!
+      r = ::mkdir(walfn.c_str(), 0755);
+      if (r < 0)
+        r = -errno;
+      if (r < 0 && r != -EEXIST) {
+        derr << __func__ << " failed to create " << walfn
+          << ": " << cpp_strerror(r)
+          << dendl;
+        return r;
+      }
+    } else {
+      struct stat st;
+      r = ::stat(walfn.c_str(), &st);
+      if (r < 0 && errno == ENOENT) {
+        kv_options.erase("separate_wal_dir");
+      }
+    }
+
+    /* if (create) {
+      env->CreateDir(dbfn);
+      env->CreateDir(walfn);
+    } */
+#endif
     BlueFSVolumeSelector::paths paths;
     bluefs->get_vselector_paths(fn, paths);
 

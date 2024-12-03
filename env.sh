@@ -1,10 +1,6 @@
 #!/usr/bin/env bash
 
-script_file=$0
-if [ "${script_file}" = "-bash" ] ; 
-    then  script_file=${BASH_ARGV[0]} 
-fi
-script_dir=$(cd `dirname ${script_file}` && pwd)
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 export PYTHON_ROOT=$HOME/anaconda3
 # export PYTHON_ROOT=$HOME/anaconda3/envs/py39
