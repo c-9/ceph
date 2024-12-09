@@ -35,6 +35,11 @@ endfunction()
 
 find_path(KVDK_INCLUDE_DIR NAMES "kvdk/engine.hpp" HINTS $(KVDK_ROOT)/include)
 find_library(KVDK_LIB NAMES libengine.so HINTS $(KVDK_ROOT)/lib)
+find_path(PMEM_INCLUDE_DIR libpmem.h HINTS ${PMEM_ROOT}/include)
+find_library(PMEM_LIBRARY NAMES pmem HINTS ${PMEM_ROOT}/lib)
+find_library(PMEMOBJ_LIBRARY NAMES pmemobj HINTS ${PMEM_ROOT}/lib)
+set(KVDK_THIRDPARTY_LIBS "")
+list(APPEND KVDK_THIRDPARTY_LIBS ${PMEM_LIBRARY} ${PMEMOBJ_LIBRARY})
 
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(KVDK
@@ -48,11 +53,10 @@ if(KVDK_FOUND)
   if(NOT TARGET KVDK)
     add_library(KVDK UNKNOWN IMPORTED)
     set_target_properties(KVDK PROPERTIES
-      INTERFACE_INCLUDE_DIRECTORIES "${KVDK_INCLUDE_DIR}"
-      INTERFACE_LINK_LIBRARIES "${KVDK_LIB}"
+      INTERFACE_INCLUDE_DIRECTORIES "${KVDK_INCLUDE_DIR};${PMEM_INCLUDE_DIR}"
+      INTERFACE_LINK_LIBRARIES "${ROCKSDB_INCLUDE_DIR};${PMEM_INCLUDE_DIR}"
       IMPORTED_LINK_INTERFACE_LANGUAGES "CXX"
       IMPORTED_LOCATION "${KVDK_LIB}")
     print_target_properties(KVDK)
   endif()
 endif()
-

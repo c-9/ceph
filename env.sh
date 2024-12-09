@@ -16,4 +16,4 @@ export CEPH_BUILD_ROOT=$CEPH_ROOT/build
 # export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/usr/local/lib:/usr/lib
 export LD_LIBRARY_PATH=$CEPH_BUILD_ROOT/lib:$PMEM_ROOT/lib:$BOOST_ROOT/lib:$ROCKSDB_ROOT/lib:$KVDK_ROOT/lib:/usr/lib/x86_64-linux-gnu:/usr/local/lib:/usr/lib
 export PATH=$CEPH_BUILD_ROOT/bin:$PATH
-
+export CEPH_BIN=$CEPH_BUILD_ROOT/bin

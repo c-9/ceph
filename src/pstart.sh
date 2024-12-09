@@ -739,22 +739,22 @@ EOF
         bluestore_block_db_create = true
         bluestore_block_wal_path = $CEPH_DEV_DIR/osd\$id/block.wal.file
         bluestore_block_wal_size = 1073741824
-        bluestore_block_wal_create = true
-        bluestore_bluefs = true"
-            if [ "$pmem_rocksdb_enabled" -eq 1 ]; then
-                BLUESTORE_OPTS+="
-        bluestore_rocksdb_options = wal_dir=$CEPH_DEV_DIR/osd\$id/wal,allow_dcpmm_writes=true,recycle_dcpmm_sst=true,dcpmm_kvs_enable=true,dcpmm_kvs_level=0,dcpmm_kvs_mmapped_file_fullpath=$CEPH_DEV_DIR/osd\$id/kvs,dcpmm_kvs_mmapped_file_size=4294967296,dcpmm_kvs_value_thres=64,dcpmm_compress_value=false,allow_mmap_reads=true
-        ; wal_dir=$CEPH_DEV_DIR/osd\$id/wal,
-        ; bluestore_bluefs_env_mirror = false
-        "
-            fi
+        bluestore_block_wal_create = true"
         else
             BLUESTORE_OPTS="        bluestore block db path = $CEPH_DEV_DIR/osd\$id/block.db.file
         bluestore block db size = 1073741824
         bluestore block db create = true
         bluestore block wal path = $CEPH_DEV_DIR/osd\$id/block.wal.file
-        bluestore block wal size = 1048576000
+        bluestore block wal size = 1073741824
         bluestore block wal create = true"
+        fi
+        if [ "$pmem_rocksdb_enabled" -eq 1 ]; then
+            BLUESTORE_OPTS+="
+        bluestore_rocksdb_options = wal_dir=$CEPH_DEV_DIR/osd\$id/wal,allow_dcpmm_writes=true,recycle_dcpmm_sst=true,dcpmm_kvs_enable=true,dcpmm_kvs_level=0,dcpmm_kvs_mmapped_file_fullpath=$CEPH_DEV_DIR/osd\$id/kvs,dcpmm_kvs_mmapped_file_size=4294967296,dcpmm_kvs_value_thres=64,dcpmm_compress_value=false,allow_mmap_reads=true
+        ; wal_dir=$CEPH_DEV_DIR/osd\$id/wal,
+        ; bluestore_bluefs_env_mirror = false
+        bluestore_bluefs = true
+        "
         fi
         if [ "$zoned_enabled" -eq 1 ]; then
             BLUESTORE_OPTS+="
@@ -823,6 +823,7 @@ $BLUESTORE_OPTS
 
         ; kstore
         kstore fsck on mount = true
+        kstore_backend = kvdk
         osd objectstore = $objectstore
 $COSDSHORT
         $(format_conf "${extra_conf}")
@@ -992,6 +993,7 @@ EOF
             if [ -n "$filestore_path" ]; then
                 ln -s $filestore_path $CEPH_DEV_DIR/osd$osd
             elif [ -n "$kstore_path" ]; then
+                mkdir -p $kstore_path
                 ln -s $kstore_path $CEPH_DEV_DIR/osd$osd
             else
                 mkdir -p $CEPH_DEV_DIR/osd$osd
@@ -1020,7 +1022,7 @@ EOF
             ceph_adm osd new $uuid -i $CEPH_DEV_DIR/osd$osd/new.json
             rm $CEPH_DEV_DIR/osd$osd/new.json
             echo $OSD_SECRET $uuid
-            exit 0
+            # exit 0
             prun $SUDO $CEPH_BIN/$ceph_osd $extra_osd_args -i $osd $ARGS --mkfs --key $OSD_SECRET --osd-uuid $uuid $extra_seastar_args
 
             local key_fn=$CEPH_DEV_DIR/osd$osd/keyring

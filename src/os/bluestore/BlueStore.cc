@@ -6667,6 +6667,7 @@ int BlueStore::_prepare_db_environment(bool create, bool read_only,
   } else {
 #if defined(HAVE_PMEM_ROCKSDB)
     env = rocksdb::NewDCPMMEnv(rocksdb::DCPMMEnvOptions());
+    fn = path + "/db";
 #endif
     string walfn = path + "/db.wal";
 

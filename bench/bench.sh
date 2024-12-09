@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 
-script_dir=$(dirname $0)
-source $script_dir/../env.sh
+current_dir=$(dirname $0)
+source $current_dir/../env.sh
 
 # VSTART_DEST=$CEPH_ROOT
 VSTART_DEST=/mnt/pmem0/ceph
 # VSTART_DEST=/mnt/pmem1/ceph1
-BTIME=30
+BTIME=20
 BSIZE=4MB
 BTHREAD=16
 BDEPTH=16
