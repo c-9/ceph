@@ -100,13 +100,14 @@ void KVDKStore::_parse_ops(const std::string &options) {
     /*  max_access_threads >= pmem_segment_blocks * pmem_block_size * max_access_threads */
     KVDKSetConfigs(kvdk_configs,
                    64,          /* uint64_t max_access_threads 64*/
-                   64ull << 30, /* uint64_t pmem_file_size (64ULL << 30)*/
+                   32ull << 30, /* uint64_t pmem_file_size (64ULL << 30)*/
                    1u,          /* unsigned char populate_pmem_space true*/
                    64u,         /* uint32_t pmem_block_size 64*/
                    2ull << 20,  /* uint64_t pmem_segment_blocks 2 * 1024 * 1024*/
                    1ull << 27,  /* uint64_t hash_bucket_num (1 << 27)*/
                    1            /* uint32_t num_buckets_per_slot 1*/
     );
+    assert((32ull << 30) >= 64 * 64 * (2ull << 20));
 }
 
 int KVDKStore::init(std::string option_str) {

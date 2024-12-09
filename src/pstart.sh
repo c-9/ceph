@@ -263,7 +263,7 @@ parse_block_devs() {
     local dev
     IFS=',' read -r -a block_devs <<< "$devs"
     for dev in "${block_devs[@]}"; do
-        if [ ! -b $dev ] || [ ! -w $dev ]; then
+        if [ ! -w $dev ]; then
             echo "All $opt_name must refer to writable block devices"
             exit 1
         fi
@@ -732,25 +732,32 @@ EOF
         bluestore_block_wal_path = \"\"
         bluestore_block_wal_size = 0
         bluestore_block_wal_create = false
-        bluestore_spdk_mem = 2048"
+        bluestore_spdk_mem = 2048
+        bdev_type = spdk
+        "
         elif [ "$pmem_enabled" -eq 1 ]; then
             BLUESTORE_OPTS="        bluestore_block_db_path = $CEPH_DEV_DIR/osd\$id/block.db.file
         bluestore_block_db_size = 1073741824
         bluestore_block_db_create = true
         bluestore_block_wal_path = $CEPH_DEV_DIR/osd\$id/block.wal.file
         bluestore_block_wal_size = 1073741824
-        bluestore_block_wal_create = true"
+        bluestore_block_wal_create = true
+        bdev_type = pmem
+        "
         else
             BLUESTORE_OPTS="        bluestore block db path = $CEPH_DEV_DIR/osd\$id/block.db.file
         bluestore block db size = 1073741824
         bluestore block db create = true
         bluestore block wal path = $CEPH_DEV_DIR/osd\$id/block.wal.file
         bluestore block wal size = 1073741824
-        bluestore block wal create = true"
+        bluestore block wal create = true
+        bdev_type = aio
+        "
         fi
         if [ "$pmem_rocksdb_enabled" -eq 1 ]; then
             BLUESTORE_OPTS+="
-        bluestore_rocksdb_options = wal_dir=$CEPH_DEV_DIR/osd\$id/wal,allow_dcpmm_writes=true,recycle_dcpmm_sst=true,dcpmm_kvs_enable=true,dcpmm_kvs_level=0,dcpmm_kvs_mmapped_file_fullpath=$CEPH_DEV_DIR/osd\$id/kvs,dcpmm_kvs_mmapped_file_size=4294967296,dcpmm_kvs_value_thres=64,dcpmm_compress_value=false,allow_mmap_reads=true
+        bluestore_rocksdb_pmem = true
+        bluestore_rocksdb_options = wal_dir=$CEPH_DEV_DIR/osd\$id/wal,allow_dcpmm_writes=true,recycle_dcpmm_sst=true,dcpmm_kvs_enable=true,dcpmm_kvs_level=0,dcpmm_kvs_mmapped_file_fullpath=$CEPH_DEV_DIR/osd\$id/kvs,dcpmm_kvs_mmapped_file_size=1073741824,dcpmm_kvs_value_thres=64,dcpmm_compress_value=false,allow_mmap_reads=true
         ; wal_dir=$CEPH_DEV_DIR/osd\$id/wal,
         ; bluestore_bluefs_env_mirror = false
         bluestore_bluefs = true
@@ -998,7 +1005,8 @@ EOF
             else
                 mkdir -p $CEPH_DEV_DIR/osd$osd
                 if [ -n "${block_devs[$osd]}" ]; then
-                    dd if=/dev/zero of=${block_devs[$osd]} bs=1M count=1
+                    # dd if=/dev/zero of=${block_devs[$osd]} bs=1M count=1
+                    dd if=/dev/zero of=${block_devs[$osd]} bs=1G count=20
                     ln -s ${block_devs[$osd]} $CEPH_DEV_DIR/osd$osd/block
                 fi
                 if [ -n "${secondary_block_devs[$osd]}" ]; then

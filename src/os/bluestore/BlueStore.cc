@@ -6594,43 +6594,40 @@ int BlueStore::_prepare_db_environment(bool create, bool read_only,
       fn = "db";
     }
 #if defined(HAVE_PMEM_ROCKSDB)
-    // env = rocksdb::NewDCPMMEnv(rocksdb::DCPMMEnvOptions(), env);
-    env = rocksdb::NewDCPMMEnv(rocksdb::DCPMMEnvOptions());
-    fn = path + "/db";
-    string walfn = path + "/wal";
+    if (cct->_conf->bluestore_rocksdb_pmem) {
+      // env = rocksdb::NewDCPMMEnv(rocksdb::DCPMMEnvOptions(), env);
+      env = rocksdb::NewDCPMMEnv(rocksdb::DCPMMEnvOptions());
+      fn = path + "/db";
+      string walfn = path + "/wal";
 
-    if (create) {
-      int r = ::mkdir(fn.c_str(), 0755);
-      if (r < 0)
-        r = -errno;
-      if (r < 0 && r != -EEXIST) {
-        derr << __func__ << " failed to create " << fn << ": " << cpp_strerror(r)
-          << dendl;
-        return r;
-      }
+      if (create) {
+        int r = ::mkdir(fn.c_str(), 0755);
+        if (r < 0)
+          r = -errno;
+        if (r < 0 && r != -EEXIST) {
+          derr << __func__ << " failed to create " << fn << ": " << cpp_strerror(r)
+            << dendl;
+          return r;
+        }
 
-      // wal_dir, too!
-      r = ::mkdir(walfn.c_str(), 0755);
-      if (r < 0)
-        r = -errno;
-      if (r < 0 && r != -EEXIST) {
-        derr << __func__ << " failed to create " << walfn
-          << ": " << cpp_strerror(r)
-          << dendl;
-        return r;
-      }
-    } else {
-      struct stat st;
-      r = ::stat(walfn.c_str(), &st);
-      if (r < 0 && errno == ENOENT) {
-        kv_options.erase("separate_wal_dir");
+        // wal_dir, too!
+        r = ::mkdir(walfn.c_str(), 0755);
+        if (r < 0)
+          r = -errno;
+        if (r < 0 && r != -EEXIST) {
+          derr << __func__ << " failed to create " << walfn
+            << ": " << cpp_strerror(r)
+            << dendl;
+          return r;
+        }
+      } else {
+        struct stat st;
+        r = ::stat(walfn.c_str(), &st);
+        if (r < 0 && errno == ENOENT) {
+          kv_options.erase("separate_wal_dir");
+        }
       }
     }
-
-    /* if (create) {
-      env->CreateDir(dbfn);
-      env->CreateDir(walfn);
-    } */
 #endif
     BlueFSVolumeSelector::paths paths;
     bluefs->get_vselector_paths(fn, paths);
@@ -6666,8 +6663,10 @@ int BlueStore::_prepare_db_environment(bool create, bool read_only,
     }
   } else {
 #if defined(HAVE_PMEM_ROCKSDB)
-    env = rocksdb::NewDCPMMEnv(rocksdb::DCPMMEnvOptions());
-    fn = path + "/db";
+    if (cct->_conf->bluestore_rocksdb_pmem) {
+      env = rocksdb::NewDCPMMEnv(rocksdb::DCPMMEnvOptions());
+      fn = path + "/db";
+    }
 #endif
     string walfn = path + "/db.wal";
 

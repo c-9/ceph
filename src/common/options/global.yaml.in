@@ -4940,6 +4940,12 @@ options:
   desc: max duration to force deferred submit
   default: 3
   with_legacy: true
+- name: bluestore_rocksdb_pmem
+  type: bool
+  level: advanced
+  desc: Enable use of pmme-rocksdb
+  default: false
+  with_legacy: true
 - name: bluestore_rocksdb_options
   type: str
   level: advanced

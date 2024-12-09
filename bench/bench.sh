@@ -3,10 +3,14 @@
 current_dir=$(dirname $0)
 source $current_dir/../env.sh
 
+function mytime () {
+     /usr/bin/time -f "real %es user %Us sys %Ss CPU %P\n(%Xtext+%Ddata %Mmax)k\t%Iinputs+%Ooutputs\n(%Fmajor+%Rminor)pagefaults\t%Wswaps" "$@"
+}
+
 # VSTART_DEST=$CEPH_ROOT
 VSTART_DEST=/mnt/pmem0/ceph
 # VSTART_DEST=/mnt/pmem1/ceph1
-BTIME=20
+BTIME=10
 BSIZE=4MB
 BTHREAD=16
 BDEPTH=16
@@ -19,13 +23,13 @@ $CEPH_BUILD_ROOT/bin/ceph -c $VSTART_DEST/ceph.conf osd pool create testbench 10
 
 echo "================write================="
 sudo sync && echo 3 | sudo tee /proc/sys/vm/drop_caches && sudo sync
-$CEPH_BUILD_ROOT/bin/rados -c $VSTART_DEST/ceph.conf bench -p testbench $BTIME write -t $BTHREAD -b $BSIZE --no-cleanup
+mytime $CEPH_BUILD_ROOT/bin/rados -c $VSTART_DEST/ceph.conf bench -p testbench $BTIME write -t $BTHREAD -b $BSIZE --no-cleanup
 
 echo "================sr================="
 sudo sync && echo 3 | sudo tee /proc/sys/vm/drop_caches && sudo sync
-$CEPH_BUILD_ROOT/bin/rados -c $VSTART_DEST/ceph.conf bench -p testbench $BTIME seq -t $BTHREAD
+mytime $CEPH_BUILD_ROOT/bin/rados -c $VSTART_DEST/ceph.conf bench -p testbench $BTIME seq -t $BTHREAD
 
 echo "================rr================="
 sudo sync && echo 3 | sudo tee /proc/sys/vm/drop_caches && sudo sync
-$CEPH_BUILD_ROOT/bin/rados -c $VSTART_DEST/ceph.conf bench -p testbench $BTIME rand -t $BTHREAD
+mytime $CEPH_BUILD_ROOT/bin/rados -c $VSTART_DEST/ceph.conf bench -p testbench $BTIME rand -t $BTHREAD
 

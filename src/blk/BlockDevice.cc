@@ -160,18 +160,22 @@ BlockDevice* BlockDevice::create_with_type(block_device_t device_type,
   switch (device_type) {
 #if defined(HAVE_LIBAIO) || defined(HAVE_POSIXAIO)
   case block_device_t::aio:
+    dout(1) << __func__ << "BlockDevice::create_with_type aio: KernelDevice" << dendl;
     return new KernelDevice(cct, cb, cbpriv, d_cb, d_cbpriv);
 #endif
 #if defined(HAVE_SPDK)
   case block_device_t::spdk:
+    dout(1) << __func__ << "BlockDevice::create_with_type spdk: NVMEDevice" << dendl;
     return new NVMEDevice(cct, cb, cbpriv);
 #endif
 #if defined(HAVE_BLUESTORE_PMEM)
   case block_device_t::pmem:
+    dout(1) << __func__ << "BlockDevice::create_with_type pmem: PMEMDevice" << dendl;
     return new PMEMDevice(cct, cb, cbpriv);
 #endif
 #if (defined(HAVE_LIBAIO) || defined(HAVE_POSIXAIO)) && defined(HAVE_LIBZBD)
   case block_device_t::hm_smr:
+    dout(1) << __func__ << "BlockDevice::create_with_type hm_smr: HMSMRDevice" << dendl;
     return new HMSMRDevice(cct, cb, cbpriv, d_cb, d_cbpriv);
 #endif
   default:
