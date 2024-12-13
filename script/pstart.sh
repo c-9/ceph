@@ -22,12 +22,12 @@ debug() {
 
 prunb() {
     debug quoted_print "$@" '&'
-    PATH=$CEPH_BIN:$PATH "$@" &
+    PATH=$CEPH_BIN:$PATH numactl -N 0 -m 0 "$@" &
 }
 
 prun() {
     debug quoted_print "$@"
-    PATH=$CEPH_BIN:$PATH "$@"
+    PATH=$CEPH_BIN:$PATH numactl -N 0 -m 0 "$@"
 }
 
 
@@ -166,6 +166,8 @@ pmem_rocksdb_enabled=0
 zoned_enabled=0
 io_uring_enabled=0
 with_jaeger=0
+makefs=1
+bluestore_no_metacache=0
 
 with_mgr_dashboard=true
 if [[ "$(get_cmake_variable WITH_MGR_DASHBOARD_FRONTEND)" != "ON" ]] ||
@@ -247,6 +249,8 @@ options:
 	--jaeger: use jaegertracing for tracing
 	--seastore-devs: comma-separated list of blockdevs to use for seastore
 	--seastore-secondary-des: comma-separated list of secondary blockdevs to use for seastore
+	--makefs: create a new filesystem
+    --bluestore-no-metacache: disable bluestore cache
 \n
 EOF
 
@@ -527,6 +531,14 @@ case $1 in
     --jaeger)
         with_jaeger=1
         echo "with_jaeger $with_jaeger"
+        shift
+        ;;
+    --makefs)
+        makefs="$2"
+        shift
+        ;;
+    --bluestore-no-metacache)
+        bluestore_no_metacache=1
         ;;
     *)
         usage_exit
@@ -720,6 +732,18 @@ EOF
         ms mon client mode = crc
 EOF
     fi
+    if [ "$bluestore_no_metacache" -eq 1 ] || [ "$bluestore_no_metacache" -eq true ]; then
+    echo "Disabling bluestore metadata cache"
+        wconf <<EOF
+        bluestore_cache_autotune = false
+        bluestore_cache_kv_ratio = 0
+        bluestore_cache_kv_onode_ratio = 0
+        bluestore_cache_meta_ratio = 0
+        bluestore_cache_size = 0
+        bluestore_cache_size_hdd = 0
+        bluestore_cache_size_ssd = 0
+EOF
+    fi
     if [ "$short" -eq 1 ]; then
         COSDSHORT="        osd max object name len = 460
         osd max object namespace len = 64"
@@ -754,10 +778,12 @@ EOF
         bdev_type = aio
         "
         fi
+        
+
         if [ "$pmem_rocksdb_enabled" -eq 1 ]; then
             BLUESTORE_OPTS+="
         bluestore_rocksdb_pmem = true
-        bluestore_rocksdb_options = wal_dir=$CEPH_DEV_DIR/osd\$id/wal,allow_dcpmm_writes=true,recycle_dcpmm_sst=true,dcpmm_kvs_enable=true,dcpmm_kvs_level=0,dcpmm_kvs_mmapped_file_fullpath=$CEPH_DEV_DIR/osd\$id/kvs,dcpmm_kvs_mmapped_file_size=1073741824,dcpmm_kvs_value_thres=64,dcpmm_compress_value=false,allow_mmap_reads=true
+        bluestore_rocksdb_options = wal_dir=$CEPH_DEV_DIR/osd\$id/wal,allow_dcpmm_writes=true,recycle_dcpmm_sst=true,dcpmm_kvs_enable=true,dcpmm_kvs_level=0,dcpmm_kvs_mmapped_file_fullpath=$CEPH_DEV_DIR/osd\$id/kvs,dcpmm_kvs_mmapped_file_size=4294967296,dcpmm_kvs_value_thres=64,dcpmm_compress_value=false,allow_mmap_reads=true
         ; wal_dir=$CEPH_DEV_DIR/osd\$id/wal,
         ; bluestore_bluefs_env_mirror = false
         bluestore_bluefs = true
@@ -1006,7 +1032,7 @@ EOF
                 mkdir -p $CEPH_DEV_DIR/osd$osd
                 if [ -n "${block_devs[$osd]}" ]; then
                     # dd if=/dev/zero of=${block_devs[$osd]} bs=1M count=1
-                    dd if=/dev/zero of=${block_devs[$osd]} bs=1G count=20
+                    dd if=/dev/zero of=${block_devs[$osd]} bs=1G count=64
                     ln -s ${block_devs[$osd]} $CEPH_DEV_DIR/osd$osd/block
                 fi
                 if [ -n "${secondary_block_devs[$osd]}" ]; then
@@ -1030,7 +1056,9 @@ EOF
             ceph_adm osd new $uuid -i $CEPH_DEV_DIR/osd$osd/new.json
             rm $CEPH_DEV_DIR/osd$osd/new.json
             echo $OSD_SECRET $uuid
-            # exit 0
+            if [ "$makefs" -eq 0 ] || [ "$makefs" -eq false ]; then
+                exit 0
+            fi
             prun $SUDO $CEPH_BIN/$ceph_osd $extra_osd_args -i $osd $ARGS --mkfs --key $OSD_SECRET --osd-uuid $uuid $extra_seastar_args
 
             local key_fn=$CEPH_DEV_DIR/osd$osd/keyring

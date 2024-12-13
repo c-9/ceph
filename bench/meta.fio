@@ -1,0 +1,37 @@
+# Runs a 64k random write test against the ceph BlueStore.
+[global]
+ioengine=libfio_ceph_objectstore.so
+conf=/mnt/pmem2/ceph/ceph.conf
+directory=/mnt/pmem2/ceph/dev/osd0/
+perf_output_file=/mnt/pmem2/ceph/fio_perf_output.json
+# create_on_open=1
+preallocate_files=1
+check_files=1
+single_pool_mode=1
+
+rw=write
+# rw=randread
+iodepth=16
+direct=1
+invalidate=1
+randrepeat=0
+do_verify=0
+verify_fatal=0
+time_based=1
+runtime=10s
+group_reporting=1
+
+[meta-test]
+# size=1024m
+# nrfiles=16
+
+# filesize=64m
+# nrfiles=100
+
+size=1G
+nrfiles=10000
+
+bs=64
+numjobs=16
+# nice=-20
+# prio=0

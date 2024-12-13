@@ -101,7 +101,7 @@ void KVDKStore::_parse_ops(const std::string &options) {
     KVDKSetConfigs(kvdk_configs,
                    64,          /* uint64_t max_access_threads 64*/
                    32ull << 30, /* uint64_t pmem_file_size (64ULL << 30)*/
-                   1u,          /* unsigned char populate_pmem_space true*/
+                   0u,          /* unsigned char populate_pmem_space true*/
                    64u,         /* uint32_t pmem_block_size 64*/
                    2ull << 20,  /* uint64_t pmem_segment_blocks 2 * 1024 * 1024*/
                    1ull << 27,  /* uint64_t hash_bucket_num (1 << 27)*/
@@ -284,7 +284,7 @@ int KVDKStore::_setkey(kvdk_op_t &op) {
 }
 
 int KVDKStore::_rmkey(kvdk_op_t &op) {
-    std::lock_guard<std::mutex> l(kvdk_lock);
+    // std::lock_guard<std::mutex> l(kvdk_lock);
     std::string key = make_key(op.first.first, op.first.second);
 
     // KVDKStatus s = KVDKDelete(kvdk_engine, key.c_str(), key.length());

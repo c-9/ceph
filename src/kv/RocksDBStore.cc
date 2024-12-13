@@ -585,7 +585,9 @@ int RocksDBStore::load_rocksdb_options(bool create_if_missing, rocksdb::Options&
     bbt_opts.pin_l0_filter_and_index_blocks_in_cache =
       cct->_conf.get_val<bool>("rocksdb_pin_l0_filter_and_index_blocks_in_cache");
 #if defined(HAVE_PMEM_ROCKSDB)
-    // bbt_opts.cache_index_and_filter_blocks_for_mmap_read = true
+    if (cct->_conf->bluestore_rocksdb_pmem) {
+      bbt_opts.cache_index_and_filter_blocks_for_mmap_read = true;
+    }
 #endif
   }
   bbt_opts.partition_filters = cct->_conf.get_val<bool>("rocksdb_partition_filters");
