@@ -5,6 +5,7 @@ source $current_dir/env.sh
 mode=RelWithDebInfo
 # mode=Debug
 ./do_cmake.sh -DCMAKE_INSTALL_PREFIX=/usr/local/ceph \
+    -DCMAKE_FIND_DEBUG_MODE=OFF \
     -DCMAKE_BUILD_TYPE=$mode \
     -DWITH_MGR=OFF \
     -DWITH_MGR_DASHBOARD_FRONTEND=OFF \

@@ -1035,7 +1035,7 @@ EOF
                 mkdir -p $CEPH_DEV_DIR/osd$osd
                 if [ -n "${block_devs[$osd]}" ]; then
                     # dd if=/dev/zero of=${block_devs[$osd]} bs=1M count=1
-                    dd if=/dev/zero of=${block_devs[$osd]} bs=1G count=16
+                    dd if=/dev/zero of=${block_devs[$osd]} bs=1G count=32
                     ln -s ${block_devs[$osd]} $CEPH_DEV_DIR/osd$osd/block
                 fi
                 if [ -n "${secondary_block_devs[$osd]}" ]; then
