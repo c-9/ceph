@@ -1,9 +1,9 @@
 # Runs a 64k random write test against the ceph BlueStore.
 [global]
 ioengine=libfio_ceph_objectstore.so
-conf=/mnt/pmem2/ceph/ceph.conf
-directory=/mnt/pmem2/ceph/dev/osd0/
-perf_output_file=/mnt/pmem2/ceph/fio_perf_output.json
+conf=/mnt/pmem2/zjq/ceph/ceph.conf
+directory=/mnt/pmem2/zjq/ceph/dev/osd0/
+perf_output_file=/mnt/pmem2/zjq/ceph/fio_perf_output.json
 # create_on_open=1
 preallocate_files=1
 check_files=1

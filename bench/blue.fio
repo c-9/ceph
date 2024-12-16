@@ -2,9 +2,9 @@
 [global]
 ioengine=libfio_ceph_objectstore.so # must be found in your LD_LIBRARY_PATH
 
-conf=/mnt/pmem2/ceph/ceph.conf # must point to a valid ceph configuration file
-directory=/mnt/pmem2/ceph/dev/osd0/ # directory for osd_data
-perf_output_file=/mnt/pmem2/ceph/fio_perf_output.json # file to store performance output
+conf=/mnt/pmem2/zjq/ceph/ceph.conf # must point to a valid ceph configuration file
+directory=/mnt/pmem2/zjq/ceph/dev/osd0/ # directory for osd_data
+perf_output_file=/mnt/pmem2/zjq/ceph/fio_perf_output.json # file to store performance output
 
 #oi_attr_len=350-4000 # specifies OI(aka '_') attribute length range to couple
                       # writes with. Default: 0 (disabled)

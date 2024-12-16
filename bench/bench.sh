@@ -4,7 +4,7 @@ current_dir=$(dirname $0)
 source $current_dir/../script/env.sh
 
 # VSTART_DEST=$CEPH_ROOT
-VSTART_DEST=/mnt/pmem2/ceph
+VSTART_DEST=/mnt/pmem2/zjq/ceph
 
 
 # BSIZE=512 # 64, 512, 1024, 4096, 65536, 1048576, 4194304, 67108864

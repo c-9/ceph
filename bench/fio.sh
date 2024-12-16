@@ -14,7 +14,7 @@ fi
 echo "benchfile: $benchfile"
 
 # VSTART_DEST=$CEPH_ROOT
-VSTART_DEST=/mnt/pmem2/ceph
+VSTART_DEST=/mnt/pmem2/zjq/ceph
 
 echo "================status================="
 $CEPH_BUILD_ROOT/bin/ceph -c $VSTART_DEST/ceph.conf -s
