@@ -827,6 +827,8 @@ int KStore::_open_db(bool create)
   string options;
   if (kv_backend == "rocksdb")
     options = cct->_conf->kstore_rocksdb_options;
+  else if (kv_backend == "kvdk")
+    options = cct->_conf->kstore_kvdk_options;
   db->init(options);
   stringstream err;
   if (create)

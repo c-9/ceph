@@ -2,15 +2,7 @@
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-
-nrun() {
-    numactl -N 0 -m 0 "$@"
-}
-
-mytime () {
-     /usr/bin/time -f "real %es user %Us sys %Ss CPU %P\n(%Xtext+%Ddata %Mmax)k\t%Iinputs+%Ooutputs\n(%Fmajor+%Rminor)pagefaults\t%Wswaps" "$@"
-}
-
+export NUMA_NODE=1
 export PYTHON_ROOT=$HOME/anaconda3
 # export PYTHON_ROOT=$HOME/anaconda3/envs/py39
 export PMEM_ROOT=/usr/local/pmdk-2.1.0
@@ -26,3 +18,11 @@ export CEPH_BUILD_ROOT=$CEPH_ROOT/build
 export LD_LIBRARY_PATH=$CEPH_BUILD_ROOT/lib:$PMEM_ROOT/lib:$BOOST_ROOT/lib:$ROCKSDB_ROOT/lib:$KVDK_ROOT/lib:/usr/lib/x86_64-linux-gnu:/usr/local/lib:/usr/lib
 export PATH=$CEPH_BUILD_ROOT/bin:$PATH
 export CEPH_BIN=$CEPH_BUILD_ROOT/bin
+
+nrun() {
+    numactl --cpunodebind=$NUMA_NODE --membind=$NUMA_NODE "$@"
+}
+
+mytime () {
+     /usr/bin/time -f "real %es user %Us sys %Ss CPU %P\n(%Xtext+%Ddata %Mmax)k\t%Iinputs+%Ooutputs\n(%Fmajor+%Rminor)pagefaults\t%Wswaps" "$@"
+}

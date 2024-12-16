@@ -4,88 +4,161 @@ from pathlib import Path
 import subprocess
 import datetime
 import re
-import matplotlib.pyplot as plt
-import scienceplots
+# import matplotlib.pyplot as plt
+# import scienceplots
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import numpy as np
+from tqdm import tqdm
 
 ceph_path = Path(os.path.dirname(__file__)) / '..'
-plt.style.use(['science', 'grid', 'no-latex'])
+# plt.style.use(['science', 'grid', 'no-latex'])
 
+CONFIG_NAMES = {
+    1: "rocks",
+    2: "procks",
+    3: "rocks+pmem",
+    4: "procks+pmem",
+    5: "kstore",
+}
+
+def run_single_benchmark(bsize, config, run_number):
+    script_path = ceph_path / 'bench/bench.sh'
+    reset_path = ceph_path / 'script/reset.sh'
+    
+    # Reset the system with the current configuration
+    subprocess.run(['bash', str(reset_path), '1', str(config)], 
+                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    
+    # Run the benchmark
+    env = os.environ.copy()
+    env['BSIZE'] = str(bsize)
+    
+    result = subprocess.run(['bash', str(script_path)], 
+                          capture_output=True, text=True, env=env)
+    
+    # Parse results
+    bandwidth_match = re.search(r'Bandwidth \(MB/sec\):\s+([\d\.]+)', result.stdout)
+    iops_match = re.search(r'Average IOPS:\s+([\d\.]+)', result.stdout)
+    
+    if bandwidth_match and iops_match:
+        return {
+            'bandwidth': float(bandwidth_match.group(1)),
+            'iops': float(iops_match.group(1))
+        }
+    return None
 
 def rados_bench():
-    script_path = ceph_path / 'bench/bench.sh'
-    log_dir = ceph_path / 'bench/log'
-    os.makedirs(log_dir, exist_ok=True)
-    current_date = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
-
-    bthread_values = [1, 2, 4, 8, 16, 32, 64]
-    # bsize_values = [64, 512, 1024, 4096, 65536, 1048576, 4194304]
+    bsize_values = [64, 512, 1024, 4096, 65536, 1048576, 4194304]
     bsize_values = [64, 512, 1024]
+    configs = range(1, 3)
+    runs_per_config = 5
+    
     results = {}
-    for bsize in bsize_values:
-        logfile = os.path.join(
-            log_dir, f'radosbench-{current_date}-[{bsize}].log')
-        resultfile = os.path.join(
-            log_dir, f'radosbench-{current_date}-[{bsize}].csv')
-        print(f'Running bench.sh with BSIZE={bsize}')
-
-        env = os.environ.copy()
-        env['BSIZE'] = str(bsize)
-
-        with open(logfile, 'w') as log_file:
-            subprocess.run(['bash', script_path], stdout=log_file,
-                           stderr=subprocess.STDOUT, env=env)
-
-        with open(logfile, 'r') as log_file:
-            log_content = log_file.read()
-            bandwidth_match = re.search(
-                r'Bandwidth \(MB/sec\):\s+([\d\.]+)', log_content)
-            iops_match = re.search(r'Average IOPS:\s+([\d\.]+)', log_content)
-            if bandwidth_match and iops_match:
-                bandwidth = float(bandwidth_match.group(1))
-                iops = float(iops_match.group(1))
-                results[bsize] = {'bandwidth': bandwidth, 'iops': iops}
-            else:
-                print(f'Failed to parse results for BSIZE={bsize}')
-
-        with open(resultfile, 'w', newline='') as csvfile:
-            csv_writer = csv.writer(csvfile)
-            csv_writer.writerow(['bsize', 'bandwidth', 'iops'])
-            for bsize, result in results.items():
-                csv_writer.writerow(
-                    [bsize, result['bandwidth'], result['iops']])
-
-    sorted_bsize = sorted(results.keys())
-    bandwidths = [results[b]['bandwidth'] for b in sorted_bsize]
-    iops_values = [results[b]['iops'] for b in sorted_bsize]
-    print('Results:')
-    for bsize, result in results.items():
-        print(
-            f'BSIZE={bsize}: Bandwidth={result["bandwidth"]}, IOPS={result["iops"]}')
-
+    
+    # Create results structure
+    for config in configs:
+        results[config] = {}
+        for bsize in bsize_values:
+            results[config][bsize] = {
+                'bandwidth': [],
+                'iops': []
+            }
+    
+    # Run benchmarks
+    for config in configs:
+        print(f"\nRunning configuration {config} ({CONFIG_NAMES[config]})")
+        for bsize in bsize_values:
+            print(f"\nBSIZE: {bsize}")
+            for run in tqdm(range(runs_per_config)):
+                result = run_single_benchmark(bsize, config, run)
+                if result:
+                    results[config][bsize]['bandwidth'].append(result['bandwidth'])
+                    results[config][bsize]['iops'].append(result['iops'])
+    
+    # Create plots using Plotly
     fig_dir = ceph_path / 'bench/fig'
     os.makedirs(fig_dir, exist_ok=True)
-    plot_filename = os.path.join(fig_dir, f'radosbench-{current_date}.png')
+    current_date = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
     
-    fig, axs = plt.subplots(1, 2, figsize=(12, 5))
-    # Plot Bandwidth vs BSIZE
-    axs[0].plot(sorted_bsize, bandwidths, marker='o')
-    axs[0].set_title('Bandwidth vs BSIZE')
-    axs[0].set_xlabel('BSIZE (Bytes)')
-    axs[0].set_ylabel('Bandwidth (MB/sec)')
-    axs[0].set_xscale('log')
-    axs[0].grid(True)
-    # Plot IOPS vs BSIZE
-    axs[1].plot(sorted_bsize, iops_values, marker='o')
-    axs[1].set_title('IOPS vs BSIZE')
-    axs[1].set_xlabel('BSIZE (Bytes)')
-    axs[1].set_ylabel('Average IOPS')
-    axs[1].set_xscale('log')
-    axs[1].grid(True)
-    plt.tight_layout()
-    plt.savefig(plot_filename)
-    plt.close()
-    print(f'Plot saved to {plot_filename}')
-
+    # Create subplot with bandwidth and IOPS
+    fig = make_subplots(rows=2, cols=1,
+                       subplot_titles=('Bandwidth Distribution by Configuration and Block Size',
+                                     'IOPS Distribution by Configuration and Block Size'))
+    
+    colors = ['rgb(31, 119, 180)', 'rgb(255, 127, 14)', 
+             'rgb(44, 160, 44)', 'rgb(214, 39, 40)', 'rgb(148, 103, 189)']
+    
+    # Add bandwidth traces
+    for idx, config in enumerate(configs):
+        for bsize_idx, bsize in enumerate(bsize_values):
+            fig.add_trace(
+                go.Box(
+                    y=results[config][bsize]['bandwidth'],
+                    name=f'{CONFIG_NAMES[config]}',
+                    legendgroup=f'config_{config}',
+                    showlegend=bsize_idx == 0,
+                    marker_color=colors[idx],
+                    x=[bsize] * len(results[config][bsize]['bandwidth']),
+                    boxpoints='all',
+                    jitter=0.3,
+                    pointpos=-1.8
+                ),
+                row=1, col=1
+            )
+    
+    # Add IOPS traces
+    for idx, config in enumerate(configs):
+        for bsize_idx, bsize in enumerate(bsize_values):
+            fig.add_trace(
+                go.Box(
+                    y=results[config][bsize]['iops'],
+                    name=f'{CONFIG_NAMES[config]}',
+                    legendgroup=f'config_{config}',
+                    showlegend=False,
+                    marker_color=colors[idx],
+                    x=[bsize] * len(results[config][bsize]['iops']),
+                    boxpoints='all',
+                    jitter=0.3,
+                    pointpos=-1.8
+                ),
+                row=2, col=1
+            )
+    
+    # Update layout
+    fig.update_layout(
+        height=1000,
+        width=1200,
+        title_text="Ceph Benchmark Results",
+        showlegend=True,
+        template="plotly_white",
+        boxmode='group'
+    )
+    
+    # Update x and y axes
+    fig.update_xaxes(type="log", title_text="Block Size (Bytes)", row=1, col=1)
+    fig.update_xaxes(type="log", title_text="Block Size (Bytes)", row=2, col=1)
+    fig.update_yaxes(title_text="Bandwidth (MB/sec)", row=1, col=1)
+    fig.update_yaxes(title_text="IOPS", row=2, col=1)
+    
+    # Save plots
+    fig.write_html(os.path.join(fig_dir, f'benchmark-results-{current_date}.html'))
+    fig.write_image(os.path.join(fig_dir, f'benchmark-results-{current_date}.png'))
+    
+    # Save raw results
+    with open(os.path.join(fig_dir, f'results-{current_date}.csv'), 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['config', 'bsize', 'run', 'bandwidth', 'iops'])
+        for config in configs:
+            for bsize in bsize_values:
+                for run in range(runs_per_config):
+                    writer.writerow([
+                        CONFIG_NAMES[config],
+                        bsize,
+                        run,
+                        results[config][bsize]['bandwidth'][run],
+                        results[config][bsize]['iops'][run]
+                    ])
 
 if __name__ == '__main__':
     rados_bench()

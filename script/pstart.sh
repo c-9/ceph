@@ -857,6 +857,9 @@ $BLUESTORE_OPTS
         ; kstore
         kstore fsck on mount = true
         kstore_backend = kvdk
+        ; pmem_file_size=4294967296
+        ; pmem_file_size=34359738368
+        kstore_kvdk_options = max_access_threads=32,pmem_file_size=4294967296,populate_pmem_space=0,pmem_block_size=64,pmem_segment_blocks=2097152,hash_bucket_num=134217728,num_buckets_per_slot=1
         osd objectstore = $objectstore
 $COSDSHORT
         $(format_conf "${extra_conf}")
@@ -1032,7 +1035,7 @@ EOF
                 mkdir -p $CEPH_DEV_DIR/osd$osd
                 if [ -n "${block_devs[$osd]}" ]; then
                     # dd if=/dev/zero of=${block_devs[$osd]} bs=1M count=1
-                    dd if=/dev/zero of=${block_devs[$osd]} bs=1G count=64
+                    dd if=/dev/zero of=${block_devs[$osd]} bs=1G count=16
                     ln -s ${block_devs[$osd]} $CEPH_DEV_DIR/osd$osd/block
                 fi
                 if [ -n "${secondary_block_devs[$osd]}" ]; then

@@ -5536,6 +5536,11 @@ options:
   desc: Options to pass through when RocksDB is used as the KeyValueDB for kstore.
   default: compression=kNoCompression
   with_legacy: true
+- name: kstore_kvdk_options
+  type: str
+  level: advanced
+  desc: Options to pass through when KVDK is used as the KeyValueDB for kstore.
+  with_legacy: true
 - name: kstore_fsck_on_mount
   type: bool
   level: advanced

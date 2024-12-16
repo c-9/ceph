@@ -150,7 +150,7 @@ int KVDKStore::do_open(ostream &out, bool create) {
     dout(1) << __func__ << dendl;
     if (create) {
         if (fs::exists(kvdk_path)) {
-            // KVDKRemovePMemContents(kvdk_path.c_str());
+            KVDKRemovePMemContents(kvdk_path.c_str());
         }
     }
     KVDKStatus s;
