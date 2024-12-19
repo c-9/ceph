@@ -112,6 +112,14 @@ void KVDKStore::_parse_ops(const std::string &options) {
                 kvdk_configs.hash_bucket_num = std::stoull(kv.back());
             } else if (kv.front() == "num_buckets_per_slot") {
                 kvdk_configs.num_buckets_per_slot = std::stoi(kv.back());
+            } else if (kv.front() == "backend") {
+                if (kv.back() == "sorted") {
+                    backend_type = SORTED_COLLECTION;
+                } else if (kv.back() == "hash") {
+                    backend_type = HASH_COLLECTION;
+                } else {
+                    derr << __func__ << " Invalid backend type: " << kv.back() << dendl;
+                }
             } else {
                 derr << __func__ << " Invalid option: " << kv.front() << dendl;
             }
@@ -146,21 +154,27 @@ int KVDKStore::do_open(std::ostream &out, bool create) {
     dout(1) << __func__ << dendl;
     if (create) {
         if (fs::exists(kvdk_path)) {
-            // KVDKRemovePMemContents(kvdk_path.c_str());
             std::string res = "rm -rf " + std::string(kvdk_path) + "\n";
             int ret __attribute__((unused)) = system(res.c_str());
         }
     }
-    kvdk::Status s;
-    // pmem::obj::string_view path_view(kvdk_path);
+    
     StringView path_view(kvdk_path);
-    s = kvdk::Engine::Open(path_view, &kvdk_engine, kvdk_configs, stdout);
-
+    kvdk::Status s = kvdk::Engine::Open(path_view, &kvdk_engine, kvdk_configs, stdout);
     assert(s == kvdk::Status::Ok);
-    s = kvdk_engine->SortedCreate(kvdk_clname);
-    std::cout << "KVDKSortedCreate: " << kvdk_clname << " Status:" << s << std::endl;
-    assert(s == (create ? kvdk::Status::Ok : kvdk::Status::Existed));
 
+    // Create collection based on backend type
+    if (backend_type == SORTED_COLLECTION) {
+        s = kvdk_engine->SortedCreate(kvdk_clname);
+    } else {
+        s = kvdk_engine->HashCreate(kvdk_clname);
+    }
+    
+    std::cout << "KVDK Collection Create: " << kvdk_clname 
+              << " Type: " << (backend_type == SORTED_COLLECTION ? "sorted" : "hash") 
+              << " Status:" << s << std::endl;
+    
+    assert(s == (create ? kvdk::Status::Ok : kvdk::Status::Existed));
     return 0;
 }
 
@@ -267,19 +281,39 @@ void KVDKStore::KVDKTransactionImpl::merge(
 }
 
 int KVDKStore::_setkey(kvdk_op_t &op) {
+    return (backend_type == SORTED_COLLECTION) ? _setkey_sorted(op) : _setkey_hash(op);
+}
+
+int KVDKStore::_setkey_sorted(kvdk_op_t &op) {
     std::string key = make_key(op.first.first, op.first.second);
     std::string value = bufferlist_to_string(op.second);
-
     kvdk::Status s = kvdk_engine->SortedPut(kvdk_clname, key, value);
     assert(s == kvdk::Status::Ok);
+    return 0;
+}
 
+int KVDKStore::_setkey_hash(kvdk_op_t &op) {
+    std::string key = make_key(op.first.first, op.first.second);
+    std::string value = bufferlist_to_string(op.second);
+    kvdk::Status s = kvdk_engine->HashPut(kvdk_clname, key, value);
+    assert(s == kvdk::Status::Ok);
     return 0;
 }
 
 int KVDKStore::_rmkey(kvdk_op_t &op) {
-    std::string key = make_key(op.first.first, op.first.second);
+    return (backend_type == SORTED_COLLECTION) ? _rmkey_sorted(op) : _rmkey_hash(op);
+}
 
+int KVDKStore::_rmkey_sorted(kvdk_op_t &op) {
+    std::string key = make_key(op.first.first, op.first.second);
     kvdk::Status s = kvdk_engine->SortedDelete(kvdk_clname, key);
+    assert(s == kvdk::Status::Ok);
+    return 0;
+}
+
+int KVDKStore::_rmkey_hash(kvdk_op_t &op) {
+    std::string key = make_key(op.first.first, op.first.second);
+    kvdk::Status s = kvdk_engine->HashDelete(kvdk_clname, key);
     assert(s == kvdk::Status::Ok);
     return 0;
 }
@@ -305,7 +339,13 @@ int KVDKStore::_merge(kvdk_op_t &op) {
 
     // Get existing value if any
     std::string existing_value;
-    kvdk::Status s = kvdk_engine->SortedGet(kvdk_clname, key, &existing_value);
+    kvdk::Status s;
+    
+    if (backend_type == SORTED_COLLECTION) {
+        s = kvdk_engine->SortedGet(kvdk_clname, key, &existing_value);
+    } else {
+        s = kvdk_engine->HashGet(kvdk_clname, key, &existing_value);
+    }
 
     std::string new_value;
     if (s == kvdk::Status::NotFound) {
@@ -319,21 +359,41 @@ int KVDKStore::_merge(kvdk_op_t &op) {
     }
 
     // Write the merged result
-    s = kvdk_engine->SortedPut(kvdk_clname, key, new_value);
+    if (backend_type == SORTED_COLLECTION) {
+        s = kvdk_engine->SortedPut(kvdk_clname, key, new_value);
+    } else {
+        s = kvdk_engine->HashPut(kvdk_clname, key, new_value);
+    }
+    
     assert(s == kvdk::Status::Ok);
-
     return 0;
 }
 
 bool KVDKStore::_get(const std::string &prefix, const std::string &k, bufferlist *out) {
+    return (backend_type == SORTED_COLLECTION) ? 
+           _get_sorted(prefix, k, out) : 
+           _get_hash(prefix, k, out);
+}
+
+bool KVDKStore::_get_sorted(const std::string &prefix, const std::string &k, bufferlist *out) {
     std::string key = make_key(prefix, k);
     std::string value;
-
     kvdk::Status s = kvdk_engine->SortedGet(kvdk_clname, key, &value);
     if (s != kvdk::Status::Ok) {
         return false;
     }
+    out->clear();
+    out->append(value);
+    return true;
+}
 
+bool KVDKStore::_get_hash(const std::string &prefix, const std::string &k, bufferlist *out) {
+    std::string key = make_key(prefix, k);
+    std::string value;
+    kvdk::Status s = kvdk_engine->HashGet(kvdk_clname, key, &value);
+    if (s != kvdk::Status::Ok) {
+        return false;
+    }
     out->clear();
     out->append(value);
     return true;

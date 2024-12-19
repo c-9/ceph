@@ -30,12 +30,18 @@ using StringView = pmem::obj::string_view;
 class KVDKStore : public KeyValueDB {
    public:
     typedef std::pair<std::pair<std::string, std::string>, ceph::bufferlist> kvdk_op_t;
+    enum BackendType {
+        SORTED_COLLECTION = 0,
+        HASH_COLLECTION = 1
+    };
+
     KVDKStore(CephContext *c, const std::string &path, void *p)
         : kvdk_cct(c),
           kvdk_path(path),
-          kvdk_priv(p) {
+          kvdk_priv(p),
+          backend_type(SORTED_COLLECTION) {
         kvdk_engine = nullptr;
-        kvdk_clname = "default_kvdk_sortedcollection";
+        kvdk_clname = "default_kvdk_collection";
         {
             kvdk_configs.max_access_threads = 64;
             kvdk_configs.pmem_file_size = 32ull << 30;
@@ -130,22 +136,42 @@ class KVDKStore : public KeyValueDB {
     using KeyValueDB::get;
 
     class KVDKWholeSpaceIteratorImpl : public KeyValueDB::WholeSpaceIteratorImpl {
-       private:
+       protected:
         kvdk::Engine *kvdk_engine;
         std::string kvdk_clname;
-        kvdk::SortedIterator *iter;
 
        public:
         KVDKWholeSpaceIteratorImpl(kvdk::Engine *engine, const std::string &clname)
-            : kvdk_engine(engine), kvdk_clname(clname) {
+            : kvdk_engine(engine), kvdk_clname(clname) {}
+
+        virtual ~KVDKWholeSpaceIteratorImpl() override {}
+        virtual int status() override { return 0; }
+        virtual bool valid() override = 0;
+        virtual std::string key() override = 0;
+        virtual std::pair<std::string, std::string> raw_key() override = 0;
+        virtual bool raw_key_is_prefixed(const std::string &prefix) override = 0;
+        virtual bufferlist value() override = 0;
+        virtual int next() override = 0;
+        virtual int prev() override = 0;
+        virtual int seek_to_first() override = 0;
+        virtual int seek_to_last() override = 0;
+        virtual int seek_to_first(const std::string &k) override = 0;
+        virtual int seek_to_last(const std::string &k) override = 0;
+        virtual int upper_bound(const std::string &prefix, const std::string &after) override = 0;
+        virtual int lower_bound(const std::string &prefix, const std::string &to) override = 0;
+    };
+
+    class KVDKSortedIteratorImpl : public KVDKWholeSpaceIteratorImpl {
+       private:
+        kvdk::SortedIterator *iter;
+
+       public:
+        KVDKSortedIteratorImpl(kvdk::Engine *engine, const std::string &clname)
+            : KVDKWholeSpaceIteratorImpl(engine, clname) {
             iter = kvdk_engine->SortedIteratorCreate(kvdk_clname);
         }
 
-        int status() override { return 0; };
-
-        bool valid() override {
-            return iter->Valid();
-        }
+        bool valid() override { return iter->Valid(); }
 
         std::string key() override {
             std::string raw_key = iter->Key();
@@ -202,6 +228,7 @@ class KVDKStore : public KeyValueDB {
             iter->Seek(k);
             return iter->Valid() ? 0 : -1;
         }
+
         int upper_bound(const std::string &prefix, const std::string &after) override {
             std::string key = make_key(prefix, after);
             iter->Seek(key);
@@ -214,10 +241,101 @@ class KVDKStore : public KeyValueDB {
             return iter->Valid() ? 0 : -1;
         }
 
-        ~KVDKWholeSpaceIteratorImpl() override {
+        ~KVDKSortedIteratorImpl() override {
             kvdk_engine->SortedIteratorRelease(iter);
         }
     };
+
+    class KVDKHashIteratorImpl : public KVDKWholeSpaceIteratorImpl {
+       private:
+        kvdk::HashIterator *iter;
+
+       public:
+        KVDKHashIteratorImpl(kvdk::Engine *engine, const std::string &clname)
+            : KVDKWholeSpaceIteratorImpl(engine, clname) {
+            iter = kvdk_engine->HashIteratorCreate(kvdk_clname);
+        }
+
+        bool valid() override { return iter->Valid(); }
+
+        std::string key() override {
+            std::string raw_key = iter->Key();
+            std::string p, k;
+            split_key(raw_key, &p, &k);
+            return k;
+        }
+
+        std::pair<std::string, std::string> raw_key() override {
+            std::string raw_key = iter->Key();
+            std::string p, k;
+            split_key(raw_key, &p, &k);
+            return {p, k};
+        }
+
+        bool raw_key_is_prefixed(const std::string &prefix) override {
+            std::string raw_key = iter->Key();
+            std::string p, k;
+            split_key(raw_key, &p, &k);
+            return p == prefix;
+        }
+
+        bufferlist value() override {
+            std::string val = iter->Value();
+            return string_to_bufferlist(val);
+        }
+
+        int next() override {
+            iter->Next();
+            return iter->Valid() ? 0 : -1;
+        }
+
+        int prev() override {
+            iter->Prev();
+            return iter->Valid() ? 0 : -1;
+        }
+
+        int seek_to_first() override {
+            iter->SeekToFirst();
+            return iter->Valid() ? 0 : -1;
+        }
+
+        int seek_to_last() override {
+            iter->SeekToLast();
+            return iter->Valid() ? 0 : -1;
+        }
+        /*
+        N.B. KVDK hash does not support seek to key, so we use seek to first and last instead.
+        */
+        int seek_to_first(const std::string &k) override {
+            return seek_to_first();
+        }
+
+        int seek_to_last(const std::string &k) override {
+            return seek_to_last();
+        }
+
+        int upper_bound(const std::string &prefix, const std::string &after) override {
+            return seek_to_last();
+        }
+
+        int lower_bound(const std::string &prefix, const std::string &to) override {
+            return seek_to_first();
+        }
+
+        ~KVDKHashIteratorImpl() override {
+            kvdk_engine->HashIteratorRelease(iter);
+        }
+    };
+
+    WholeSpaceIterator get_wholespace_iterator(IteratorOpts opts = 0) override {
+        if (backend_type == SORTED_COLLECTION) {
+            return std::shared_ptr<KeyValueDB::WholeSpaceIteratorImpl>(
+                new KVDKSortedIteratorImpl(kvdk_engine, kvdk_clname));
+        } else {
+            return std::shared_ptr<KeyValueDB::WholeSpaceIteratorImpl>(
+                new KVDKHashIteratorImpl(kvdk_engine, kvdk_clname));
+        }
+    }
 
     uint64_t get_estimated_size(std::map<std::string, uint64_t> &extra) override {
         return -EOPNOTSUPP;
@@ -225,11 +343,6 @@ class KVDKStore : public KeyValueDB {
 
     int get_statfs(struct store_statfs_t *buf) override {
         return -EOPNOTSUPP;
-    }
-
-    WholeSpaceIterator get_wholespace_iterator(IteratorOpts opts = 0) override {
-        return std::shared_ptr<KeyValueDB::WholeSpaceIteratorImpl>(
-            new KVDKWholeSpaceIteratorImpl(kvdk_engine, kvdk_clname));
     }
 
    protected:
@@ -242,6 +355,15 @@ class KVDKStore : public KeyValueDB {
     kvdk::Configs kvdk_configs;
     kvdk::Engine *kvdk_engine;
     std::string kvdk_clname;
+    BackendType backend_type;
+
+    // Helper methods for different backends
+    int _setkey_sorted(kvdk_op_t &op);
+    int _setkey_hash(kvdk_op_t &op);
+    int _rmkey_sorted(kvdk_op_t &op);
+    int _rmkey_hash(kvdk_op_t &op);
+    bool _get_sorted(const std::string &prefix, const std::string &k, bufferlist *out);
+    bool _get_hash(const std::string &prefix, const std::string &k, bufferlist *out);
 };
 
 #endif

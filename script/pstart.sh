@@ -5,6 +5,8 @@
 # abort on failure
 set -e
 
+export NUMA_NODE=1
+
 quoted_print() {
     for s in "$@"; do
         if [[ "$s" =~ \  ]]; then
@@ -22,12 +24,12 @@ debug() {
 
 prunb() {
     debug quoted_print "$@" '&'
-    PATH=$CEPH_BIN:$PATH numactl -N 0 -m 0 "$@" &
+    PATH=$CEPH_BIN:$PATH numactl -N $NUMA_NODE -m $NUMA_NODE "$@" &
 }
 
 prun() {
     debug quoted_print "$@"
-    PATH=$CEPH_BIN:$PATH numactl -N 0 -m 0 "$@"
+    PATH=$CEPH_BIN:$PATH numactl -N $NUMA_NODE -m $NUMA_NODE "$@"
 }
 
 
@@ -168,6 +170,7 @@ io_uring_enabled=0
 with_jaeger=0
 makefs=1
 bluestore_no_metacache=0
+pmem_populate=0
 
 with_mgr_dashboard=true
 if [[ "$(get_cmake_variable WITH_MGR_DASHBOARD_FRONTEND)" != "ON" ]] ||
@@ -251,6 +254,7 @@ options:
 	--seastore-secondary-des: comma-separated list of secondary blockdevs to use for seastore
 	--makefs: create a new filesystem
     --bluestore-no-metacache: disable bluestore cache
+    --pmem-populate: populate pmem space
 \n
 EOF
 
@@ -540,6 +544,9 @@ case $1 in
     --bluestore-no-metacache)
         bluestore_no_metacache=1
         ;;
+    --pmem-populate)
+        pmem_populate=1
+        ;;
     *)
         usage_exit
 esac
@@ -732,9 +739,10 @@ EOF
         ms mon client mode = crc
 EOF
     fi
-    if [ "$bluestore_no_metacache" -eq 1 ] || [ "$bluestore_no_metacache" -eq true ]; then
+    if [ "$bluestore_no_metacache" -eq 1 ]; then
     echo "Disabling bluestore metadata cache"
         wconf <<EOF
+        bluestore_default_buffered_write = false
         bluestore_cache_autotune = false
         bluestore_cache_kv_ratio = 0
         bluestore_cache_kv_onode_ratio = 0
@@ -742,6 +750,10 @@ EOF
         bluestore_cache_size = 0
         bluestore_cache_size_hdd = 0
         bluestore_cache_size_ssd = 0
+EOF
+    else
+        wconf <<EOF
+        bluestore_default_buffered_write = true
 EOF
     fi
     if [ "$short" -eq 1 ]; then
@@ -858,8 +870,9 @@ $BLUESTORE_OPTS
         kstore fsck on mount = true
         kstore_backend = kvdk
         ; pmem_file_size=4294967296
+        ; pmem_file_size=17179869184
         ; pmem_file_size=34359738368
-        kstore_kvdk_options = max_access_threads=32,pmem_file_size=4294967296,populate_pmem_space=0,pmem_block_size=64,pmem_segment_blocks=2097152,hash_bucket_num=134217728,num_buckets_per_slot=1
+        kstore_kvdk_options = max_access_threads=32,pmem_file_size=17179869184,populate_pmem_space=$pmem_populate,pmem_block_size=64,pmem_segment_blocks=2097152,hash_bucket_num=134217728,num_buckets_per_slot=1,backend=sorted
         osd objectstore = $objectstore
 $COSDSHORT
         $(format_conf "${extra_conf}")
@@ -1035,7 +1048,11 @@ EOF
                 mkdir -p $CEPH_DEV_DIR/osd$osd
                 if [ -n "${block_devs[$osd]}" ]; then
                     # dd if=/dev/zero of=${block_devs[$osd]} bs=1M count=1
-                    dd if=/dev/zero of=${block_devs[$osd]} bs=1G count=32
+                    dd if=/dev/zero of=${block_devs[$osd]} bs=1G count=64
+                    if [ "$pmem_populate" -eq 1 ]; then
+                        echo 'pmem populating..'
+                        prun $CEPH_BUILD_ROOT/../script/utils/pp ${block_devs[$osd]} -t 16
+                    fi
                     ln -s ${block_devs[$osd]} $CEPH_DEV_DIR/osd$osd/block
                 fi
                 if [ -n "${secondary_block_devs[$osd]}" ]; then
@@ -1059,7 +1076,7 @@ EOF
             ceph_adm osd new $uuid -i $CEPH_DEV_DIR/osd$osd/new.json
             rm $CEPH_DEV_DIR/osd$osd/new.json
             echo $OSD_SECRET $uuid
-            if [ "$makefs" -eq 0 ] || [ "$makefs" -eq false ]; then
+            if [ "$makefs" -eq 0 ]; then
                 exit 0
             fi
             prun $SUDO $CEPH_BIN/$ceph_osd $extra_osd_args -i $osd $ARGS --mkfs --key $OSD_SECRET --osd-uuid $uuid $extra_seastar_args
