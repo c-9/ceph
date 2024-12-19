@@ -5,7 +5,8 @@
 # abort on failure
 set -e
 
-export NUMA_NODE=1
+current_dir=$(dirname $0)
+source $current_dir/env.sh
 
 quoted_print() {
     for s in "$@"; do
